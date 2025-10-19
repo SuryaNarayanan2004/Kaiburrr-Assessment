@@ -1,0 +1,107 @@
+# Kaiburr Task Manager - MongoDB Deployment with Persistent Storage
+# This manifest deploys MongoDB with persistent volume for data storage
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb-pv
+  labels:
+    app: mongodb
+spec:
+  # Persistent volume configuration for MongoDB data
+  storageClassName: manual
+  capacity:
+    storage: 2Gi  # 2GB storage for MongoDB data
+  accessModes:
+    - ReadWriteOnce  # Single node read/write access
+  hostPath:
+    path: /tmp/mongodb  # Local path on the node
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  labels:
+    app: mongodb
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi  # Request 2GB of storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        tier: database
+    spec:
+      containers:
+      - name: mongodb
+        # Official MongoDB image
+        image: mongo:7
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        env:
+        # MongoDB configuration
+        - name: MONGO_INITDB_ROOT_USERNAME
+          value: "admin"
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          value: "password"
+        - name: MONGO_INITDB_DATABASE
+          value: "taskdb"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        # Mount the persistent volume to /data/db (MongoDB data directory)
+        - name: mongodb-storage
+          mountPath: /data/db
+        livenessProbe:
+          tcpSocket:
+            port: 27017
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 27017
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: mongodb-storage
+        persistentVolumeClaim:
+          claimName: mongodb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  labels:
+    app: mongodb
+spec:
+  type: ClusterIP  # Internal cluster service (not exposed externally)
+  ports:
+  - port: 27017
+    targetPort: 27017
+    protocol: TCP
+    name: mongodb
+  selector:
+    app: mongodb

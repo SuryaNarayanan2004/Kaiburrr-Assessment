@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kaiburr-task-manager
+  labels:
+    app: kaiburr-task-manager
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kaiburr-task-manager
+  template:
+    metadata:
+      labels:
+        app: kaiburr-task-manager
+        tier: backend
+    spec:
+      containers:
+        - name: kaiburr-task-manager
+          image: kaiburr-task-manager:latest
+          imagePullPolicy: Never  # Use local image on Minikube/Docker Desktop
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: MONGO_HOST
+              value: "mongodb-service"
+            - name: MONGO_PORT
+              value: "27017"
+            - name: MONGO_DB
+              value: "taskdb"
+            - name: SERVER_PORT
+              value: "8080"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /tasks
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /tasks
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
